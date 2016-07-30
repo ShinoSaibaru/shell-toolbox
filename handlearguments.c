@@ -30,15 +30,16 @@ int handle_arguments(int argc, char *argv[]) {
 	} else if (argc == 3) {
 		if (strcmp(argv[1], "-d") == 0) {
 			for (index = 0; index < file_count; ++index) {
-				if (strcmp(argv[2], filenames[index])) {
+				if (strcmp(argv[2], filenames[index]) == 0) {
 					printf("%s: %s\n", filenames[index], descriptions[index]);
-					return -2;
+					return -1;
 				}
 			}
 
 			fprintf(stderr, "%s: %s\n", argv[2], "Tool not found.");
 			return 2;
 		} else {
+			usage();
 			return 1;
 		}
 	}

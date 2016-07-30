@@ -5,17 +5,18 @@
 
 #include "declarations.h"
 
-int execute(int argc, char *argv[]) {
-	pid_t parent_id, session_id;
+int execute(char *arguments[]) {
+	pid_t parent_id;
+	int status;
 
 	parent_id = fork();
 	if (parent_id < 0) {
 		fprintf(stderr, "%s\n", "Couldn't create a child process for tool execution.");
-		return;
+		return -1;
 	} else if (parent_id > 0) {
-		waitpid(parent_id, NULL, 0);
-		return 0;
+		waitpid(parent_id, &status, 0);
+		return status;
 	}
 
-	execv(argv[0], argv + 1);
+	execv(arguments[0], arguments + 1);
 }
