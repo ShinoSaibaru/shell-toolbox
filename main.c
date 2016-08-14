@@ -98,66 +98,85 @@ int handle_arguments(int argc, char *argv[]) {
 			return 2;
 		}
 
-	} else if (argc == 3) {
+	} else if (argc >= 3) {
+		char buffer[1024];
+		index = 1;
 		if (strcmp(argv[1], "-d") == 0) {
-			for (index = 0; index < file_count; ++index) {
-				if (strcmp(argv[2], filenames[index]) == 0) {
-					printf("%s: %s\n", filenames[index], descriptions[index]);
-					return -1;
+			while (++index != argc) {
+				int index1;
+				for (index1 = 0; index1 < file_count; ++index1) {
+					fprintf(stderr, "%d\n", index1);
+					if (strcmp(argv[index], filenames[index1]) == 0) {
+						printf("%s: %s\n--------\n", filenames[index1], descriptions[index1]);
+						break;
+					}
+				}
+				if (index1 == file_count) {
+					fprintf(stderr, "%s: %s\n", argv[index], "Tool not found.");
+					return 2;
 				}
 			}
 
-			fprintf(stderr, "%s: %s\n", argv[2], "Tool not found.");
-			return 2;
+			return -1;
 		} else if (strcmp(argv[1], "-p") == 0) {
 			FILE *source, *target;
-			char copied[1024];
 			char buf;
+			char buf1[2] = {'\0', '\0'};
+			while (++index != argc) {
+				strcpy(buffer, home_directory);
+				strcat(buffer, "/.shtb/");
+				strcat(buffer, argv[index]);
+				if (access(buffer, F_OK) == 0) {
+					printf("%s\n", "The file exists already. Overwrite? [Y|y|N|n]");
+					fgets(buf1, sizeof(buf1), stdin);
+					if (buf1[1] != '\n') {
+						int ch;
+						while (((ch = getchar()) != '\n') && (ch != EOF));
+					}
+					buf1[1] = '\0';
+					if (buf1[0] != 'y' && buf1[0] != 'Y') {
+						continue;
+					}
+				}
+				source = fopen(argv[index], "r");
+				if (source == NULL) {
+					perror("fopen");
+					return 4;
+				}
+				target = fopen(buffer, "w");
+				if (target == NULL) {
+					perror("fopen");
+					return 4;
+				}
+				while ((buf = fgetc(source)) != EOF) {
+					fputc(buf, target);
+				}
 
-			source = fopen(argv[2], "r");
-			if (source == NULL) {
-				perror("fopen");
-				return 4;
-			}
-			strcpy(copied, home_directory);
-			strcat(copied, "/.shtb/");
-			strcat(copied, argv[2]);
-			target = fopen(copied, "w");
-			if (target == NULL) {
-				perror("fopen");
-				return 4;
-			}
-			while ((buf = fgetc(source)) != EOF) {
-				fputc(buf, target);
+				fclose(source);
+				fclose(target);
+				printf("%s %s\n", argv[index], "put into the toolbox.");
 			}
 
-			fclose(source);
-			fclose(target);
-			printf("%s %s\n", argv[2], "put into the toolbox.");
 			return -1;
 		} else if (strcmp(argv[1], "-r") == 0) {
-			char removal[1024];
-
-			strcpy(removal, home_directory);
-			strcat(removal, "/.shtb/");
-			strcat(removal, argv[2]);
-			if (remove(removal) != 0) {
-				perror("remove");
-				return 3;
-			} else {
-				printf("%s %s\n", argv[2], "removed from the toolbox.");
-				return -1;
+			while (++index != argc) {
+				strcpy(buffer, home_directory);
+				strcat(buffer, "/.shtb/");
+				strcat(buffer, argv[index]);
+				if (remove(buffer) != 0) {
+					perror("remove");
+					return 3;
+				} else {
+					printf("%s %s\n", argv[index], "removed from the toolbox.");
+				}
 			}
-		} else {
-			fprintf(stderr, "%s\n", "Invalid arguments.");
-			return 1;
+
+			return -1;
 		}
-	} else {
-		fprintf(stderr, "%s\n", "Invalid arguments.");
-		return 1;
 	}
 
-	return 0;
+	fprintf(stderr, "%s\n", "Invalid arguments.");
+	return 1;
 }
 
 void usage() {
@@ -165,6 +184,8 @@ void usage() {
 		"-l: List the contents of the toolbox.\n"
 		"-d: List the contents along with the descriptions.\n"
 		"-d \"toolname\": Show the description of the \"toolname\".\n"
+		"-p \"toolname\": Put the file \"toolname\" into the toolbox.\n"
+		"-r \"toolname\": Remove the file \"toolname\" from the toolbox.\n"
 		"-h: Show this usage help.\n");
 }
 
@@ -173,10 +194,10 @@ int load_scripts() {
 	struct dirent *shtb_content;
 	int index;
 	FILE *test_file;
-	char description_string[16384];
+	char description_string[65536];
 	int file_size;
 	char *beginning_pointer, *description_pointer, *second_description_pointer;
-	char helper_path[16384];
+	char helper_path[1024];
 
 	home_directory = strdup(getenv("HOME"));
 	strcpy(helper_path, home_directory);
