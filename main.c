@@ -23,7 +23,10 @@ int main(int argc, char *argv[]) {
 	int index;
 	char executable[1024];
 
-	load_scripts();
+	return_code = load_scripts();
+	if (return_code != 0) {
+		return return_code;
+	}
 
 	return_code = handle_arguments(argc, argv);
 	if (return_code > 0) {
@@ -56,6 +59,7 @@ int main(int argc, char *argv[]) {
 	free(descriptions);
 	free(arguments);
 	free(program);
+	free(home_directory);
 
 	return return_code;
 }
@@ -66,9 +70,12 @@ int handle_arguments(int argc, char *argv[]) {
 	if (argc == 1) {
 		usage();
 		return -1;
-
 	} else if (argc == 2) {
 		if (strcmp(argv[1], "-l") == 0) {
+			if (file_count == 0) {
+				fprintf(stderr, "%s\n", "No tools in the toolbox!");
+				return 5;
+			}
 			for (index = 0; index < file_count; ++index) {
 				printf("%s\n", filenames[index]);
 			}
@@ -83,6 +90,10 @@ int handle_arguments(int argc, char *argv[]) {
 			usage();
 			return 1;
 		} else if (strcmp(argv[1], "-d") == 0) {
+			if (file_count == 0) {
+				fprintf(stderr, "%s\n", "No tools in the toolbox!");
+				return 5;
+			}
 			for (index = 0; index < file_count; ++index) {
 				printf("%s: %s\n--------\n", filenames[index], descriptions[index]);
 			}
@@ -102,10 +113,13 @@ int handle_arguments(int argc, char *argv[]) {
 		char buffer[1024];
 		index = 1;
 		if (strcmp(argv[1], "-d") == 0) {
+			if (file_count == 0) {
+				fprintf(stderr, "%s\n", "No tools in the toolbox!");
+				return 5;
+			}
 			while (++index != argc) {
 				int index1;
 				for (index1 = 0; index1 < file_count; ++index1) {
-					fprintf(stderr, "%d\n", index1);
 					if (strcmp(argv[index], filenames[index1]) == 0) {
 						printf("%s: %s\n--------\n", filenames[index1], descriptions[index1]);
 						break;
@@ -140,11 +154,13 @@ int handle_arguments(int argc, char *argv[]) {
 				}
 				source = fopen(argv[index], "r");
 				if (source == NULL) {
+					fprintf(stderr, "%s %s:\n", "Error with ", argv[index]);
 					perror("fopen");
 					return 4;
 				}
 				target = fopen(buffer, "w");
 				if (target == NULL) {
+					fprintf(stderr, "%s %s:\n", "Error with ", argv[index]);
 					perror("fopen");
 					return 4;
 				}
@@ -164,6 +180,7 @@ int handle_arguments(int argc, char *argv[]) {
 				strcat(buffer, "/.shtb/");
 				strcat(buffer, argv[index]);
 				if (remove(buffer) != 0) {
+					fprintf(stderr, "%s %s:\n", "Error with ", buffer);
 					perror("remove");
 					return 3;
 				} else {
@@ -194,27 +211,26 @@ int load_scripts() {
 	struct dirent *shtb_content;
 	int index;
 	FILE *test_file;
-	char description_string[65536];
+	char description_string[1045876];
 	int file_size;
 	char *beginning_pointer, *description_pointer, *second_description_pointer;
-	char helper_path[1024];
+	char helper_path[512];
+	int read_count;
 
 	home_directory = strdup(getenv("HOME"));
 	strcpy(helper_path, home_directory);
 	strcat(helper_path, "/.shtb");
 	shtb_directory = opendir(helper_path);
 	if (shtb_directory == NULL) {
+		fprintf(stderr, "%s %s:\n", "Error with ", helper_path);
 		perror("opendir");
-		return 1;
+		return 0;
 	}
 
 	while (shtb_content = readdir(shtb_directory)) {
 		if (shtb_content->d_type == DT_REG) {
 			++file_count;
 		}
-	}
-	if (file_count == 0) {
-		return 3;
 	}
 
 	rewinddir(shtb_directory);
@@ -229,6 +245,7 @@ int load_scripts() {
 			strcat(helper_path, filenames[index]);
 			test_file = fopen(helper_path, "r");
 			if (test_file == NULL) {
+				fprintf(stderr, "%s %s:\n", "Error with ", helper_path);
 				perror("fopen");
 				return 2;
 			}
@@ -236,9 +253,10 @@ int load_scripts() {
 			fseek(test_file, 0, SEEK_END);
 			file_size = ftell(test_file);
 			rewind(test_file);
-			if (fread(description_string, 1, file_size, test_file) == 0) {
+			if ((read_count = fread(description_string, 1, file_size, test_file)) != file_size) {
+				fprintf(stderr, "%s %s:\n", "Error with ", helper_path);
 				perror("fread");
-				return 4;
+				return 3;
 			}
 			description_string[file_size] = '\0';
 
